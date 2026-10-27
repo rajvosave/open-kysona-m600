@@ -64,7 +64,7 @@ implemented. Use at your own risk; see the licence.
 
 ## Contributing
 
-Captures are the most useful contribution: a USBPcap/Wireshark capture of the vendor app changing
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/capturing.md](docs/capturing.md). Captures are the most useful contribution: a USBPcap/Wireshark capture of the vendor app changing
 one setting at a time, with the clock visible in a screen recording. Button remaps, LED settings
 and sensor mode are the missing pieces.
 
