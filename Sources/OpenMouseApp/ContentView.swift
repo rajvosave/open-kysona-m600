@@ -45,11 +45,15 @@ struct ContentView: View {
             }
             .disabled(!model.isOpen)
             settingsPanel
-            ScrollView {
-                Text(model.log.joined(separator: "\n"))
-                    .font(.system(.caption, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    Text(model.log.joined(separator: "\n"))
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                    Color.clear.frame(height: 1).id("logEnd")
+                }
+                .onChange(of: model.log.count) { _ in proxy.scrollTo("logEnd", anchor: .bottom) }
             }
             .background(.quaternary.opacity(0.4))
         }
@@ -79,9 +83,14 @@ struct ContentView: View {
                     toggle("Motion sync", s.motionSync, .motionSync)
                     toggle("Angle snapping", s.angleSnapping, .angleSnapping)
                     toggle("Ripple control", s.rippleControl, .rippleControl)
+                    if let b = model.battery {
+                        Text("Battery: \(b.percent) %, \(b.millivolts) mV (meaning of these bytes unconfirmed)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     HStack {
                         Button("Refresh") { model.refreshSettings() }
                         Button("Restore initial values") { model.restoreInitial() }
+                        Button("Clear log") { model.clearLog() }
                     }
                 }
                 .disabled(model.busy || !model.isOpen)

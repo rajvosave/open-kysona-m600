@@ -81,6 +81,10 @@ public final class MouseDevice {
         ReportRate.parse(valueByte: try await exchange(Protocol.flashRead(address: 0x0000, count: 1))[6])
     }
 
+    public func readBattery() async throws -> BatteryStatus? {
+        BatteryStatus.parse(reply: try await exchange(Protocol.readBattery()))
+    }
+
     /// A one-byte app setting (LOD, motion sync, ...), nil if the reply fails its checksum.
     public func readValue(_ setting: Protocol.Setting) async throws -> UInt8? {
         Protocol.valuePair(from: try await exchange(Protocol.readValuePair(address: setting.rawValue)))

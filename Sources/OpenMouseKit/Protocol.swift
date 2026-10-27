@@ -21,6 +21,7 @@ public enum Protocol {
         case flashRead = 0x08
         case setCurrentConfig = 0x0F
         case readVersion = 0x12
+        case readBattery = 0x04
     }
 
     /// Builds a 17-byte frame: `08 <cmd> <params, zero padded to 14> <checksum>`.
@@ -129,6 +130,10 @@ public enum Protocol {
             return Array(reply[2...5]) == Array(request[2...5])
         }
         return true
+    }
+
+    public static func readBattery() -> [UInt8] {
+        frame(.readBattery)
     }
 
     public static func readVersion() -> [UInt8] {

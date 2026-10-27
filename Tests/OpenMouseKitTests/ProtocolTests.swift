@@ -168,4 +168,16 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(Array(f[0..<8]), [0x08, 0x07, 0x00, 0x00, 0x04, 0x02, 0x03, 0x52])
         XCTAssertEqual(f[16], 0xEB)
     }
+
+    // Polling reply captured from the vendor app: 08 04 00 00 00 02 50 00 0F B4 ...
+    func testBatteryReply() {
+        var r = [UInt8](repeating: 0, count: 17)
+        r[0] = 0x08; r[1] = 0x04; r[5] = 0x02; r[6] = 0x50; r[7] = 0x00; r[8] = 0x0F; r[9] = 0xB4
+        r[16] = Protocol.checksum(r[0..<16])
+        XCTAssertEqual(r[16], 0x34)   // matches the captured frame
+        XCTAssertEqual(BatteryStatus.parse(reply: r), BatteryStatus(percent: 80, flag: 0, millivolts: 4020))
+        r[16] ^= 0xFF
+        XCTAssertNil(BatteryStatus.parse(reply: r))
+        XCTAssertEqual(Protocol.readBattery()[1], 0x04)
+    }
 }

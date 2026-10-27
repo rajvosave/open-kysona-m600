@@ -72,6 +72,7 @@ final class AppModel: ObservableObject {
 
     @Published var settings: SettingsSnapshot?
     @Published var busy = false
+    @Published var battery: BatteryStatus?
     /// Values at the first successful load after opening, for "Restore initial values".
     private var initialSettings: SettingsSnapshot?
 
@@ -95,6 +96,7 @@ final class AppModel: ObservableObject {
             defer { busy = false }
             do {
                 settings = try await loadSettings()
+                battery = try await device.readBattery()
                 if initialSettings == nil { initialSettings = settings }
             } catch { append("settings read failed: \(error) (is the mouse awake? move it)") }
         }
@@ -176,6 +178,8 @@ final class AppModel: ObservableObject {
     }
 
     private func append(_ line: String) { log.append(line) }
+
+    func clearLog() { log.removeAll() }
 
     static func hex(_ bytes: [UInt8]) -> String {
         bytes.map { String(format: "%02X", $0) }.joined(separator: " ")

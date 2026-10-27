@@ -117,3 +117,20 @@ public enum ReportRate: UInt8, CaseIterable {
 
     public static func parse(valueByte: UInt8) -> ReportRate? { ReportRate(rawValue: valueByte) }
 }
+
+/// Reply to `Protocol.readBattery()`: data at reply byte 6 is `percent flag mV_hi mV_lo`.
+/// Seen as `50 00 0F AB` (80 %, 4011 mV) with a full battery icon in the vendor app, and the
+/// millivolts drift by a few counts between polls. The meaning is a guess: the percent and
+/// millivolt split fits the data, but the flag byte is unknown.
+public struct BatteryStatus: Equatable {
+    public var percent: UInt8
+    public var flag: UInt8
+    public var millivolts: Int
+
+    public static func parse(reply: [UInt8]) -> BatteryStatus? {
+        guard reply.count == Protocol.reportLength, reply[1] == Protocol.Command.readBattery.rawValue,
+              reply[16] == Protocol.checksum(reply[0..<16]) else { return nil }
+        return BatteryStatus(percent: reply[6], flag: reply[7],
+                             millivolts: Int(reply[8]) << 8 | Int(reply[9]))
+    }
+}
