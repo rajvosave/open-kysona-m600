@@ -15,6 +15,10 @@ final class AppModel: ObservableObject {
         transport.onDevicesChanged = { [weak self] in
             Task { @MainActor in self?.refresh() }
         }
+        device.onEvent = { [weak self] _ in
+            // The mouse changed something itself (DPI or report-rate button): follow along.
+            Task { @MainActor in self?.refreshSettings() }
+        }
         device.onTraffic = { [weak self] direction, bytes in
             let arrow = direction == .sent ? "->" : "<-"
             self?.append("\(arrow) \(Self.hex(bytes))")
@@ -28,6 +32,12 @@ final class AppModel: ObservableObject {
         if selectedID == nil || !interfaces.contains(where: { $0.id == selectedID }) {
             selectedID = interfaces.first(where: \.looksLikeVendorChannel)?.id
             isOpen = false
+            settings = nil; stages = []; battery = nil
+            status = selectedID == nil ? "No mouse found. Plug in the dongle." : "Connecting…"
+        }
+        // Connect on its own once the control channel shows up.
+        if !isOpen, let id = selectedID, interfaces.first(where: { $0.id == id })?.looksLikeVendorChannel == true {
+            openSelected()
         }
     }
 
@@ -36,11 +46,13 @@ final class AppModel: ObservableObject {
         do {
             try transport.open(id)
             isOpen = true
+            status = "Connecting…"
             append("opened interface \(id)")
             initialSettings = nil
             refreshSettings()
         } catch {
             append("open failed: \(error)")
+            status = "Could not open the mouse. Allow Input Monitoring in System Settings."
         }
     }
 
@@ -68,17 +80,20 @@ final class AppModel: ObservableObject {
         var motionSync: UInt8
         var angleSnapping: UInt8
         var rippleControl: UInt8
+        var sensorMode: UInt8   // 0 = LP; HP value unconfirmed, so read-only
     }
 
     @Published var settings: SettingsSnapshot?
     @Published var busy = false
     @Published var battery: BatteryStatus?
+    @Published var stages: [MouseDevice.Stage] = []
+    @Published var status = "No mouse found. Plug in the dongle."
     /// Values at the first successful load after opening, for "Restore initial values".
     private var initialSettings: SettingsSnapshot?
 
     private func loadSettings() async throws -> SettingsSnapshot? {
         var v: [MouseSetting: UInt8] = [:]
-        for s in [MouseSetting.reportRate, .currentDPIIndex, .lod, .motionSync, .angleSnapping, .rippleControl] {
+        for s in [MouseSetting.reportRate, .currentDPIIndex, .lod, .motionSync, .angleSnapping, .rippleControl, .sensorMode] {
             guard let value = try await device.readValue(s) else {
                 append("\(s) read failed its checksum"); return nil
             }
@@ -86,7 +101,7 @@ final class AppModel: ObservableObject {
         }
         return SettingsSnapshot(reportRate: v[.reportRate]!, dpiStage: v[.currentDPIIndex]!, lod: v[.lod]!,
                                 motionSync: v[.motionSync]!, angleSnapping: v[.angleSnapping]!,
-                                rippleControl: v[.rippleControl]!)
+                                rippleControl: v[.rippleControl]!, sensorMode: v[.sensorMode]!)
     }
 
     func refreshSettings() {
@@ -96,9 +111,14 @@ final class AppModel: ObservableObject {
             defer { busy = false }
             do {
                 settings = try await loadSettings()
+                stages = try await device.readStages()
                 battery = try await device.readBattery()
                 if initialSettings == nil { initialSettings = settings }
-            } catch { append("settings read failed: \(error) (is the mouse awake? move it)") }
+                status = settings == nil ? "Unexpected reply. Try Refresh." : "Connected"
+            } catch {
+                append("settings read failed: \(error)")
+                status = "Mouse not responding. Move it, then Refresh."
+            }
         }
     }
 
@@ -183,5 +203,21 @@ final class AppModel: ObservableObject {
 
     static func hex(_ bytes: [UInt8]) -> String {
         bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+    }
+}
+
+extension AppModel {
+    /// Fixed values for the preview image (`--render-preview`).
+    static func demo() -> AppModel {
+        let m = AppModel()
+        m.isOpen = true
+        m.status = "Connected"
+        m.settings = SettingsSnapshot(reportRate: 0x01, dpiStage: 2, lod: 1, motionSync: 1,
+                                      angleSnapping: 0, rippleControl: 0, sensorMode: 0)
+        let table: [(Int, UInt8, UInt8, UInt8)] = [(400, 0x80, 0x80, 0), (800, 0, 0xFF, 0), (1600, 0x80, 0, 0xFF),
+                                                   (3200, 0xFF, 0x80, 0xFF), (6400, 0xFF, 0, 0), (26000, 0x80, 0, 0xFF)]
+        m.stages = table.map { MouseDevice.Stage(dpi: DPIEntry(x: $0.0, y: $0.0), color: DPIColor(r: $0.1, g: $0.2, b: $0.3)) }
+        m.battery = BatteryStatus(percent: 80, flag: 0, millivolts: 4011)
+        return m
     }
 }

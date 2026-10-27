@@ -15,6 +15,9 @@ public final class MouseDevice {
     /// Hex-friendly traffic log hook for the diagnostics view.
     public var onTraffic: ((Direction, [UInt8]) -> Void)?
     public enum Direction { case sent, received }
+    /// Unsolicited report from the mouse (command 0x0A). Byte 6 is 1 after the DPI button and
+    /// 2 after the report-rate button.
+    public var onEvent: ((UInt8) -> Void)?
 
     public init(transport: HIDTransport) {
         self.transport = transport
@@ -29,6 +32,7 @@ public final class MouseDevice {
         // only a report that answers the request in flight resolves it.
         guard report.first == Protocol.leadByte else { return }
         onTraffic?(.received, report)
+        if report.count == Protocol.reportLength, report[1] == 0x0A { onEvent?(report[6]) }
         guard let request = pending, Protocol.isReply(report, to: request) else { return }
         pending = nil
         timeoutTask?.cancel()
@@ -106,6 +110,7 @@ public final class MouseDevice {
     public struct Stage: Equatable {
         public var dpi: DPIEntry?
         public var color: DPIColor
+        public init(dpi: DPIEntry?, color: DPIColor) { self.dpi = dpi; self.color = color }
     }
 
     /// DPI and colour of every stage, read-only. Not yet checked against hardware.

@@ -12,6 +12,7 @@ public enum ReplyField {
 
 public struct DPIColor: Equatable {
     public var r: UInt8, g: UInt8, b: UInt8
+    public init(r: UInt8, g: UInt8, b: UInt8) { self.r = r; self.g = g; self.b = b }
     public static let fallback = DPIColor(r: 0xFF, g: 0xFF, b: 0xFF)
 
     /// `R G B <chk>`
@@ -84,6 +85,7 @@ public struct SettingsBlock: Equatable {
 public struct DPIEntry: Equatable {
     public var x: Int
     public var y: Int
+    public init(x: Int, y: Int) { self.x = x; self.y = y }
 
     public static func parse(_ b: [UInt8]) -> DPIEntry? {
         guard b.count >= 4, ReplyField.isValid(b, values: 0..<3, checksumAt: 3) else { return nil }
@@ -126,6 +128,9 @@ public struct BatteryStatus: Equatable {
     public var percent: UInt8
     public var flag: UInt8
     public var millivolts: Int
+    public init(percent: UInt8, flag: UInt8, millivolts: Int) {
+        self.percent = percent; self.flag = flag; self.millivolts = millivolts
+    }
 
     public static func parse(reply: [UInt8]) -> BatteryStatus? {
         guard reply.count == Protocol.reportLength, reply[1] == Protocol.Command.readBattery.rawValue,
