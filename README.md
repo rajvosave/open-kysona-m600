@@ -3,9 +3,10 @@
 An unofficial macOS app for configuring the Kysona M600 V2 mouse, written from scratch in Swift.
 The vendor's configuration tool only runs on Windows.
 
-![Main window](docs/preview.png)
+![Settings tab](docs/preview.png)
+![Buttons tab](docs/preview-buttons.png)
 
-*The picture is rendered with demo values (`OpenMouse --render-preview out.png`), no mouse attached.*
+*The pictures are rendered with demo values (`OpenMouse --render-preview out.png [buttons]`), no mouse attached. The mouse drawing is our own, not vendor artwork.*
 
 ## Status
 

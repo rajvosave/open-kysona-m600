@@ -12,10 +12,19 @@ enum Theme {
 }
 
 struct MouseView: View {
+    enum Tab: String, CaseIterable { case settings = "Settings", buttons = "Buttons" }
+
     @EnvironmentObject var model: AppModel
     var onDiagnostics: () -> Void = {}
     /// False only for the preview image: `ImageRenderer` cannot draw a ScrollView.
     var scrollable = true
+    @State private var tab: Tab
+
+    init(onDiagnostics: @escaping () -> Void = {}, scrollable: Bool = true, tab: Tab = .settings) {
+        self.onDiagnostics = onDiagnostics
+        self.scrollable = scrollable
+        _tab = State(initialValue: tab)
+    }
 
     /// Colour being picked for the active stage; written only when Apply is pressed, so dragging
     /// in the picker doesn't send a flash write per frame.
@@ -27,7 +36,7 @@ struct MouseView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(Theme.hairline)
-            if scrollable { ScrollView { content } } else { content; Spacer(minLength: 0) }
+            if scrollable { ScrollView { page } } else { page; Spacer(minLength: 0) }
             Divider().overlay(Theme.hairline)
             footer
         }
@@ -36,11 +45,17 @@ struct MouseView: View {
         .preferredColorScheme(.dark)
     }
 
+    @ViewBuilder private var page: some View {
+        switch tab {
+        case .settings: content
+        case .buttons: ButtonsTab(enabled: enabled, scrollable: scrollable)
+        }
+    }
+
     private var content: some View {
         VStack(alignment: .leading, spacing: 32) {
             dpiSection
             rateSection
-            buttonSection
             sensorSection
         }
         .padding(28)
@@ -52,6 +67,19 @@ struct MouseView: View {
     private var header: some View {
         HStack(spacing: 16) {
             Text("M600 V2").font(.title2.weight(.semibold))
+            HStack(spacing: 4) {
+                ForEach(Tab.allCases, id: \.self) { t in
+                    Button { tab = t } label: {
+                        Text(t.rawValue).font(.callout.weight(.medium))
+                            .padding(.horizontal, 14).padding(.vertical, 6)
+                            .background(tab == t ? Theme.panel : Color.clear, in: Capsule())
+                            .overlay(Capsule().stroke(tab == t ? Theme.hairline : Color.clear))
+                            .foregroundStyle(tab == t ? Color.white : Theme.dim)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.leading, 12)
             Spacer()
             if let b = model.battery {
                 HStack(spacing: 6) {
@@ -188,56 +216,6 @@ struct MouseView: View {
                     }
                 }
             }
-        }
-    }
-
-    // MARK: buttons
-
-    /// Named by each button's factory function (its default in the mouse's flash).
-    private static let buttonNames = ["Left button", "Right button", "Middle button",
-                                      "Back button", "Forward button", "DPI button"]
-
-    private var buttonSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Buttons")
-            if model.keys.count < KeyMap.physicalSlots.count {
-                Text("Waiting for the mouse…").foregroundStyle(Theme.dim)
-            } else {
-                ForEach(Array(KeyMap.physicalSlots), id: \.self) { slot in
-                    HStack {
-                        Text(Self.buttonNames[slot]).foregroundStyle(Theme.dim).frame(width: 150, alignment: .leading)
-                        buttonMenu(slot)
-                    }
-                }
-            }
-            Text("Names are each button's factory function. At least one button always stays Left click. Macros and shortcuts can't be edited yet.")
-                .font(.caption).foregroundStyle(Theme.dim)
-        }
-    }
-
-    @ViewBuilder private func buttonMenu(_ slot: Int) -> some View {
-        let current = model.keys[slot]
-        if let current, current.isEditable, scrollable {
-            Menu {
-                ForEach(KeyFunction.choices, id: \.title) { choice in
-                    Button(choice.title) { model.changeKey(slot: slot, to: choice) }
-                }
-            } label: {
-                Text(current.title).frame(width: 170, alignment: .leading)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Theme.panel, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.hairline))
-            }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-            .disabled(!enabled)
-        } else if let current, current.isEditable {
-            // ImageRenderer can't draw a Menu, so the preview image shows the same chip as text.
-            Text(current.title).frame(width: 170, alignment: .leading)
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.hairline))
-        } else {
-            Text(current?.title ?? "unreadable").foregroundStyle(Theme.dim)
         }
     }
 

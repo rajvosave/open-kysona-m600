@@ -14,15 +14,17 @@ struct OpenMouseApp: App {
     }
 }
 
-/// `OpenMouse --render-preview out.png` saves the main view with fixed demo values and quits.
+/// `OpenMouse --render-preview out.png [buttons]` saves the main view (or its Buttons tab) with
+/// fixed demo values and quits.
 /// Used to look at the layout without a mouse attached.
 @MainActor
 private func renderPreviewIfRequested() {
     let args = CommandLine.arguments
     guard let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count else { return }
-    let renderer = ImageRenderer(content: MouseView(scrollable: false)
+    let buttons = args.count > i + 2 && args[i + 2] == "buttons"
+    let renderer = ImageRenderer(content: MouseView(scrollable: false, tab: buttons ? .buttons : .settings)
         .environmentObject(AppModel.demo())
-        .frame(width: 820, height: 1010))
+        .frame(width: 820, height: buttons ? 640 : 760))
     renderer.scale = 2
     if let tiff = renderer.nsImage?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
        let png = rep.representation(using: .png, properties: [:]) {
