@@ -29,6 +29,8 @@ struct MouseView: View {
     /// Colour being picked for the active stage; written only when Apply is pressed, so dragging
     /// in the picker doesn't send a flash write per frame.
     @State private var pickedColor = Color.white
+    /// DPI being picked for the active stage; written only when Apply is pressed.
+    @State private var pickedDPI = 800
 
     private var enabled: Bool { model.isOpen && model.settings != nil && !model.busy }
 
@@ -132,8 +134,9 @@ struct MouseView: View {
                 }
                 if model.stages.isEmpty { Text("Waiting for the mouse…").foregroundStyle(Theme.dim) }
             }
+            dpiRow
             colorRow
-            Text("Click a stage to make it active. Like the vendor app, only the active stage's colour can be changed; DPI values can't be edited.")
+            Text("Click a stage to make it active, then set its DPI (100 to 32000; steps of 50 up to 26000, then 100) or colour.")
                 .font(.caption).foregroundStyle(Theme.dim)
         }
     }
@@ -153,11 +156,53 @@ struct MouseView: View {
         return DPIColor(r: byte(ns.redComponent), g: byte(ns.greenComponent), b: byte(ns.blueComponent))
     }
 
+    /// Snaps a slider value to the nearest DPI a stage accepts.
+    private static func snapped(_ value: Double) -> Int {
+        let v = Int(value.rounded())
+        let r = StageTable.dpiRange
+        if v <= StageTable.fineLimit { return min(max((v + 25) / 50 * 50, r.lowerBound), StageTable.fineLimit) }
+        return min((v + 50) / 100 * 100, r.upperBound)
+    }
+
+    @ViewBuilder private var dpiRow: some View {
+        if let stage = activeStage, let current = model.stages[stage].dpi?.x {
+            let range = StageTable.dpiRange
+            HStack(spacing: 14) {
+                Text("Stage \(stage + 1) DPI").font(.callout).foregroundStyle(Theme.dim)
+                    .frame(width: 110, alignment: .leading)
+                if scrollable {
+                    Slider(value: Binding(get: { Double(pickedDPI) }, set: { pickedDPI = Self.snapped($0) }),
+                           in: Double(range.lowerBound)...Double(range.upperBound))
+                        .frame(width: 260).disabled(!enabled)
+                    TextField("DPI", value: $pickedDPI, format: .number.grouping(.never))
+                        .textFieldStyle(.roundedBorder).frame(width: 72).multilineTextAlignment(.trailing)
+                        .disabled(!enabled)
+                } else {
+                    // ImageRenderer can't draw a Slider or TextField: the preview image shows stand-ins.
+                    let fraction = Double(current - range.lowerBound) / Double(range.upperBound - range.lowerBound)
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.panel).frame(width: 260, height: 4)
+                        Circle().fill(.white).frame(width: 16, height: 16).offset(x: 244 * fraction)
+                    }
+                    .frame(width: 260, height: 16)
+                    Text(String(current)).monospacedDigit().frame(width: 72, alignment: .trailing)
+                        .padding(.vertical, 4).background(Theme.panel, in: RoundedRectangle(cornerRadius: 5))
+                }
+                textButton("Apply") { model.changeDPI(stage: stage, to: pickedDPI) }
+                    .disabled(!enabled || !DPIEntry.isValid(dpi: pickedDPI) || pickedDPI == current)
+            }
+            .onAppear { pickedDPI = current }
+            .onChange(of: stage) { _ in pickedDPI = model.stages[stage].dpi?.x ?? pickedDPI }
+            .onChange(of: current) { pickedDPI = $0 }
+        }
+    }
+
     @ViewBuilder private var colorRow: some View {
         if let stage = activeStage {
             let current = model.stages[stage].color
             HStack(spacing: 14) {
                 Text("Stage \(stage + 1) colour").font(.callout).foregroundStyle(Theme.dim)
+                    .frame(width: 110, alignment: .leading)
                 if scrollable {
                     ColorPicker("", selection: $pickedColor, supportsOpacity: false)
                         .labelsHidden().disabled(!enabled)

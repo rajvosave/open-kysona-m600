@@ -91,7 +91,27 @@ public struct DPIEntry: Equatable {
         guard b.count >= 4, ReplyField.isValid(b, values: 0..<3, checksumAt: 3) else { return nil }
         let xCode = Int(b[0]) | (Int(b[2] >> 2) & 3) << 8
         let yCode = Int(b[1]) | (Int(b[2] >> 6) & 3) << 8
-        return DPIEntry(x: (xCode + 1) * 50, y: (yCode + 1) * 50)
+        // The vendor app's flags: 0x22 means 100 DPI steps, 0x11 doubles the value.
+        let scale = ((b[2] & 0x22) != 0 ? 2 : 1) * ((b[2] & 0x11) != 0 ? 2 : 1)
+        return DPIEntry(x: (xCode + 1) * 50 * scale, y: (yCode + 1) * 50 * scale)
+    }
+
+    /// True for a DPI a stage can be set to: 100...32000, in steps of 50 up to 26000 and of 100
+    /// above it (the vendor app's two ranges).
+    public static func isValid(dpi: Int) -> Bool {
+        guard StageTable.dpiRange.contains(dpi) else { return false }
+        return dpi <= StageTable.fineLimit ? dpi % 50 == 0 : dpi % 100 == 0
+    }
+
+    /// `x y hi chk` for the same DPI on both axes, nil for a value `isValid` rejects. Above 26000
+    /// the code counts in 100s and `hi` carries the 0x11 doubling flag, as the vendor app writes it.
+    public static func encode(dpi: Int) -> [UInt8]? {
+        guard isValid(dpi: dpi) else { return nil }
+        let doubled = dpi > StageTable.fineLimit
+        let code = dpi / (doubled ? 100 : 50) - 1
+        let top = UInt8((code >> 8) & 3)
+        let v: [UInt8] = [UInt8(code & 0xFF), UInt8(code & 0xFF), (top << 2) | (top << 6) | (doubled ? 0x11 : 0)]
+        return v + [Protocol.checksum(v)]
     }
 }
 
@@ -99,6 +119,10 @@ public struct DPIEntry: Equatable {
 public enum StageTable {
     public static let stageCount = 6
     public static func dpiAddress(stage: Int) -> UInt16 { UInt16(0x0C + 4 * stage) }
+    /// What a stage may be set to (minimum and maximum as the mouse reports them). Up to
+    /// `fineLimit` the step is 50 DPI, above it 100.
+    public static let dpiRange = 100...32000
+    public static let fineLimit = 26000
     /// Colour entries are `R G B chk`; stage 0 is at 0x2C (confirmed by writes in a USB capture).
     public static func colorAddress(stage: Int) -> UInt16 { UInt16(0x2C + 4 * stage) }
 }

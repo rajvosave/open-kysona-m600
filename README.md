@@ -15,7 +15,7 @@ and the wired mouse use the same vendor ID and are matched, but are untested.
 
 | Feature | Read | Write |
 |---|---|---|
-| DPI stages (value, colour, active stage) | yes | active stage and its colour (the vendor app can't edit stage values either) |
+| DPI stages (value, colour, active stage) | yes | yes: pick the active stage, then set its DPI (100 to 32000) and colour |
 | Report rate 125 / 250 / 500 / 1000 Hz | yes | yes |
 | Lift-off distance 1 / 2 mm | yes | yes |
 | Ripple control, angle snapping, motion sync | yes | yes |

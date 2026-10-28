@@ -224,4 +224,34 @@ final class ProtocolTests: XCTestCase {
         // The two pairs just before the table are not a slot.
         XCTAssertNil(KeyMap.parse([0x03, 0x52, 0x00, 0x55]))
     }
+
+    func testStageDPIEncoding() {
+        // The factory entries read from the mouse are what the encoder produces.
+        XCTAssertEqual(DPIEntry.encode(dpi: 400), [0x07, 0x07, 0x00, 0x47])
+        XCTAssertEqual(DPIEntry.encode(dpi: 800), [0x0F, 0x0F, 0x00, 0x37])
+        XCTAssertEqual(DPIEntry.encode(dpi: 6400), [0x7F, 0x7F, 0x00, 0x57])
+        XCTAssertEqual(DPIEntry.encode(dpi: 26000), [0x07, 0x07, 0x88, 0xBF])
+        // Above 26000: code counts in 100s, hi carries the 0x11 doubling flag plus the top bits.
+        XCTAssertEqual(DPIEntry.encode(dpi: 32000)?.prefix(3), [0x3F, 0x3F, 0x55])
+        XCTAssertEqual(DPIEntry.encode(dpi: 26100)?.prefix(3), [0x04, 0x04, 0x55])
+        // Round trip over the whole allowed set, and everything else is refused.
+        for dpi in 0...33000 {
+            if let e = DPIEntry.encode(dpi: dpi) {
+                XCTAssertTrue(DPIEntry.isValid(dpi: dpi))
+                XCTAssertEqual(DPIEntry.parse(e), DPIEntry(x: dpi, y: dpi), "dpi \(dpi)")
+            } else {
+                XCTAssertFalse(DPIEntry.isValid(dpi: dpi))
+            }
+        }
+        XCTAssertEqual((0...33000).filter { DPIEntry.isValid(dpi: $0) }.count, 519 + 60)
+        XCTAssertNil(DPIEntry.encode(dpi: 50))     // below the minimum
+        XCTAssertNil(DPIEntry.encode(dpi: 425))
+        XCTAssertNil(DPIEntry.encode(dpi: 26050))  // above 26000 the step is 100
+        XCTAssertNil(DPIEntry.encode(dpi: 32100))
+        // Write frame: 08 07 00 00 <addr> 04 x y hi chk.
+        let frame = Protocol.setStageDPI(stage: 2, dpi: 1600)!
+        XCTAssertEqual(Array(frame[0..<10]), [0x08, 0x07, 0x00, 0x00, 0x14, 0x04, 0x1F, 0x1F, 0x00, 0x17])
+        XCTAssertEqual(frame[16], Protocol.checksum(frame[0..<16]))
+        XCTAssertNil(Protocol.setStageDPI(stage: 2, dpi: 1625))
+    }
 }

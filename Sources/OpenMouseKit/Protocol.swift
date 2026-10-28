@@ -61,6 +61,14 @@ public enum Protocol {
         return flashWrite(address: StageTable.colorAddress(stage: stage), data: rgb + [checksum(rgb)])
     }
 
+    /// DPI of one stage (same value on X and Y): `x y hi chk` at `StageTable.dpiAddress`.
+    /// Nil for a value the encoder rejects.
+    public static func setStageDPI(stage: Int, dpi: Int) -> [UInt8]? {
+        precondition((0..<StageTable.stageCount).contains(stage), "stage out of range")
+        guard let entry = DPIEntry.encode(dpi: dpi) else { return nil }
+        return flashWrite(address: StageTable.dpiAddress(stage: stage), data: entry)
+    }
+
     /// Report rate write: 2 bytes at 0x0000, the one-hot value then its checksum.
     public static func setReportRate(_ value: UInt8) -> [UInt8] {
         writeValue(address: 0x0000, value: value)

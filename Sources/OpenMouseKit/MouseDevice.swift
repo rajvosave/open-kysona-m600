@@ -146,6 +146,13 @@ public final class MouseDevice {
         return (0..<KeyMap.slotCount).map { KeyMap.parse(Array(raw[(4 * $0)..<(4 * $0 + 4)])) }
     }
 
+    /// Writes one stage's DPI and returns true if the mouse echoed the frame unchanged.
+    public func writeStageDPI(stage: Int, dpi: Int) async throws -> Bool {
+        guard (0..<StageTable.stageCount).contains(stage),
+              let frame = Protocol.setStageDPI(stage: stage, dpi: dpi) else { throw HIDTransportError.valueRejected }
+        return try await exchange(frame) == frame
+    }
+
     /// Writes one button slot and returns true if the mouse echoed the frame unchanged.
     /// Only the six physical buttons and only editable functions are accepted.
     public func writeKeyFunction(slot: Int, _ function: KeyFunction) async throws -> Bool {

@@ -93,6 +93,7 @@ final class AppModel: ObservableObject {
     /// Values at the first successful load after opening, for "Restore initial values".
     private var initialSettings: SettingsSnapshot?
     private var initialColors: [DPIColor] = []
+    private var initialDPIs: [Int?] = []
     private var initialKeys: [KeyFunction?] = []
 
     private func loadSettings() async throws -> SettingsSnapshot? {
@@ -118,7 +119,7 @@ final class AppModel: ObservableObject {
                 stages = try await device.readStages()
                 keys = try await device.readKeyMap()
                 battery = try await device.readBattery()
-                if initialSettings == nil { initialSettings = settings; initialColors = stages.map(\.color); initialKeys = keys }
+                if initialSettings == nil { initialSettings = settings; initialColors = stages.map(\.color); initialDPIs = stages.map { $0.dpi?.x }; initialKeys = keys }
                 status = settings == nil ? "Unexpected reply. Try Refresh." : "Connected"
             } catch {
                 append("settings read failed: \(error)")
@@ -183,6 +184,28 @@ final class AppModel: ObservableObject {
                + (echoed && back == function ? "  -> verified" : "  -> NOT verified"))
     }
 
+    /// Writes one stage's DPI (same on X and Y), then checks the echo and reads the stages back.
+    func changeDPI(stage: Int, to dpi: Int) {
+        guard !busy, stages.indices.contains(stage), DPIEntry.isValid(dpi: dpi),
+              stages[stage].dpi?.x != dpi else { return }
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await writeDPIAndVerify(stage, dpi)
+                stages = try await device.readStages()
+            } catch { append("stage DPI write failed: \(error) (is the mouse awake? move it)") }
+        }
+    }
+
+    private func writeDPIAndVerify(_ stage: Int, _ dpi: Int) async throws {
+        append("WRITE stage \(stage + 1) DPI = \(dpi)")
+        let echoed = try await device.writeStageDPI(stage: stage, dpi: dpi)
+        let back = try await device.readStages()[stage].dpi
+        append("stage \(stage + 1) DPI: echo \(echoed ? "ok" : "MISMATCH"), read back \(back.map { String($0.x) } ?? "bad checksum")"
+               + (echoed && back == DPIEntry(x: dpi, y: dpi) ? "  -> verified" : "  -> NOT verified"))
+    }
+
     private func writeColorAndVerify(_ stage: Int, _ color: DPIColor) async throws {
         append("WRITE stage \(stage + 1) colour = \(String(format: "%02X%02X%02X", color.r, color.g, color.b))")
         let echoed = try await device.writeStageColor(stage: stage, color)
@@ -202,6 +225,11 @@ final class AppModel: ObservableObject {
                     if let wanted = initialKeys[slot], keys[slot] != wanted, keys[slot]?.isEditable == true, wanted.isEditable {
                         try await writeKeyAndVerify(slot, wanted)
                         keys[slot] = wanted
+                    }
+                }
+                for (i, wanted) in initialDPIs.enumerated() where stages.indices.contains(i) {
+                    if let wanted, stages[i].dpi?.x != wanted, DPIEntry.isValid(dpi: wanted) {
+                        try await writeDPIAndVerify(i, wanted)
                     }
                 }
                 for (i, wanted) in initialColors.enumerated() where stages.indices.contains(i) && stages[i].color != wanted {
