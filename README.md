@@ -30,8 +30,27 @@ compared. The app also refreshes by itself when you press the mouse's own DPI or
 
 ## Install
 
-There is no prebuilt download, so build it yourself. An app you build on your own Mac opens
-normally, with no Gatekeeper warning.
+### Prebuilt app
+
+[`build/OpenMouse.zip`](build/OpenMouse.zip) is a universal build (Apple Silicon and Intel, macOS 13+).
+It is ad-hoc signed, not notarized, so macOS blocks it the first time.
+
+1. Download the zip and unzip it. Move `OpenMouse.app` to `/Applications` if you like.
+2. Clear the quarantine flag, or right-click the app → Open → Open (on macOS 15 and later use
+   System Settings → Privacy & Security → Open Anyway):
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/OpenMouse.app
+   ```
+
+3. Open the app and allow **Input Monitoring** when asked, then quit and reopen it.
+4. Plug in the dongle and move the mouse. The app connects on its own.
+
+SHA-256 of the current zip: `96d575df39420ba2c04c5e0f50c3580ad0b8de102db0a7fa577306dcec0f7414`
+
+### Build it yourself
+
+An app you build on your own Mac opens normally, with no Gatekeeper warning.
 
 1. Install the command line tools if you don't have Xcode: `xcode-select --install`.
 2. Clone and build:
@@ -42,17 +61,11 @@ normally, with no Gatekeeper warning.
    Scripts/make-app.sh
    ```
 
-3. Move `dist/OpenMouse.app` to `/Applications` (optional) and open it.
-4. Allow **Input Monitoring** when asked, then quit and reopen the app.
-5. Plug in the dongle and move the mouse. The app connects on its own.
+3. Open `dist/OpenMouse.app`, allow Input Monitoring, then quit and reopen it.
 
 Rebuilding changes the app's ad-hoc signature, so macOS asks for Input Monitoring again. If the app
 stops connecting after a rebuild, run `tccutil reset ListenEvent io.github.rajvosave.openmouse` and
 reopen it.
-
-A `.app` copied from someone else's Mac is not notarized. macOS blocks it until you right-click →
-Open (or use Privacy & Security → Open Anyway), and it only runs on the same CPU architecture it was
-built on.
 
 ## Build and run
 
