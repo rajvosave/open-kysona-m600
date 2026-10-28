@@ -102,6 +102,13 @@ public final class MouseDevice {
         return try await exchange(frame) == frame
     }
 
+    /// Writes one stage's colour and returns true if the mouse echoed the frame unchanged.
+    public func writeStageColor(stage: Int, _ color: DPIColor) async throws -> Bool {
+        guard (0..<StageTable.stageCount).contains(stage) else { throw HIDTransportError.valueRejected }
+        let frame = Protocol.setStageColor(stage: stage, color: color)
+        return try await exchange(frame) == frame
+    }
+
     /// Bytes of a flash range, from the data field of each reply.
     public func readFlash(address: UInt16, length: Int) async throws -> [UInt8] {
         try await readFlashRaw(address: address, length: length).flatMap { $0[6..<(6 + Int($0[5]))] }

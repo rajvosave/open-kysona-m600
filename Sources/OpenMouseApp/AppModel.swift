@@ -90,6 +90,7 @@ final class AppModel: ObservableObject {
     @Published var status = "No mouse found. Plug in the dongle."
     /// Values at the first successful load after opening, for "Restore initial values".
     private var initialSettings: SettingsSnapshot?
+    private var initialColors: [DPIColor] = []
 
     private func loadSettings() async throws -> SettingsSnapshot? {
         var v: [MouseSetting: UInt8] = [:]
@@ -113,7 +114,7 @@ final class AppModel: ObservableObject {
                 settings = try await loadSettings()
                 stages = try await device.readStages()
                 battery = try await device.readBattery()
-                if initialSettings == nil { initialSettings = settings }
+                if initialSettings == nil { initialSettings = settings; initialColors = stages.map(\.color) }
                 status = settings == nil ? "Unexpected reply. Try Refresh." : "Connected"
             } catch {
                 append("settings read failed: \(error)")
@@ -135,6 +136,27 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Writes one stage's colour, then checks the echo and reads the stages back.
+    func changeColor(stage: Int, to color: DPIColor) {
+        guard !busy, stages.indices.contains(stage), stages[stage].color != color else { return }
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await writeColorAndVerify(stage, color)
+                stages = try await device.readStages()
+            } catch { append("stage colour write failed: \(error) (is the mouse awake? move it)") }
+        }
+    }
+
+    private func writeColorAndVerify(_ stage: Int, _ color: DPIColor) async throws {
+        append("WRITE stage \(stage + 1) colour = \(String(format: "%02X%02X%02X", color.r, color.g, color.b))")
+        let echoed = try await device.writeStageColor(stage: stage, color)
+        let back = try await device.readStages()[stage].color
+        append("stage \(stage + 1) colour: echo \(echoed ? "ok" : "MISMATCH")"
+               + (echoed && back == color ? "  -> verified" : "  -> NOT verified"))
+    }
+
     /// Writes back every setting that differs from the values first read after opening.
     func restoreInitial() {
         guard !busy, let target = initialSettings, let now = settings else { return }
@@ -142,6 +164,9 @@ final class AppModel: ObservableObject {
         Task {
             defer { busy = false }
             do {
+                for (i, wanted) in initialColors.enumerated() where stages.indices.contains(i) && stages[i].color != wanted {
+                    try await writeColorAndVerify(i, wanted)
+                }
                 let pairs: [(MouseSetting, String, UInt8, UInt8)] = [
                     (.reportRate, "report rate", now.reportRate, target.reportRate),
                     (.currentDPIIndex, "DPI stage", now.dpiStage, target.dpiStage),
@@ -153,6 +178,7 @@ final class AppModel: ObservableObject {
                     try await writeAndVerify(setting, wanted, name: name)
                 }
                 settings = try await loadSettings()
+                stages = try await device.readStages()
             } catch { append("restore failed: \(error)") }
         }
     }

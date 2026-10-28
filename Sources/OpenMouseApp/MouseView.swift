@@ -17,6 +17,10 @@ struct MouseView: View {
     /// False only for the preview image: `ImageRenderer` cannot draw a ScrollView.
     var scrollable = true
 
+    /// Colour being picked for the active stage; written only when Apply is pressed, so dragging
+    /// in the picker doesn't send a flash write per frame.
+    @State private var pickedColor = Color.white
+
     private var enabled: Bool { model.isOpen && model.settings != nil && !model.busy }
 
     var body: some View {
@@ -99,8 +103,45 @@ struct MouseView: View {
                 }
                 if model.stages.isEmpty { Text("Waiting for the mouse…").foregroundStyle(Theme.dim) }
             }
-            Text("Click a stage to make it active. DPI values and colours can't be edited yet.")
+            colorRow
+            Text("Click a stage to make it active. Like the vendor app, only the active stage's colour can be changed; DPI values can't be edited.")
                 .font(.caption).foregroundStyle(Theme.dim)
+        }
+    }
+
+    private var activeStage: Int? {
+        guard let s = model.settings, Int(s.dpiStage) < model.stages.count else { return nil }
+        return Int(s.dpiStage)
+    }
+
+    private static func swiftUIColor(_ c: DPIColor) -> Color {
+        Color(red: Double(c.r) / 255, green: Double(c.g) / 255, blue: Double(c.b) / 255)
+    }
+
+    private static func dpiColor(_ color: Color) -> DPIColor {
+        let ns = NSColor(color).usingColorSpace(.sRGB) ?? .white
+        func byte(_ v: CGFloat) -> UInt8 { UInt8(max(0, min(255, (v * 255).rounded()))) }
+        return DPIColor(r: byte(ns.redComponent), g: byte(ns.greenComponent), b: byte(ns.blueComponent))
+    }
+
+    @ViewBuilder private var colorRow: some View {
+        if let stage = activeStage {
+            let current = model.stages[stage].color
+            HStack(spacing: 14) {
+                Text("Stage \(stage + 1) colour").font(.callout).foregroundStyle(Theme.dim)
+                if scrollable {
+                    ColorPicker("", selection: $pickedColor, supportsOpacity: false)
+                        .labelsHidden().disabled(!enabled)
+                } else {
+                    // ImageRenderer can't draw a ColorPicker, so the preview image shows a swatch.
+                    Rectangle().fill(Self.swiftUIColor(current)).frame(width: 44, height: 24)
+                }
+                textButton("Apply") { model.changeColor(stage: stage, to: Self.dpiColor(pickedColor)) }
+                    .disabled(!enabled || Self.dpiColor(pickedColor) == current)
+            }
+            .onAppear { pickedColor = Self.swiftUIColor(current) }
+            .onChange(of: stage) { _ in pickedColor = Self.swiftUIColor(model.stages[stage].color) }
+            .onChange(of: current) { pickedColor = Self.swiftUIColor($0) }
         }
     }
 

@@ -95,6 +95,14 @@ final class ProtocolTests: XCTestCase {
 
     func testStageAddressesAndColorWrites() {
         XCTAssertEqual((0..<6).map { StageTable.colorAddress(stage: $0) }, [0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40])
+
+        // Stage colour write: 08 07 00 00 <addr> 04 R G B chk, frame checksum 0x55 - sum.
+        let frame = Protocol.setStageColor(stage: 1, color: DPIColor(r: 0x80, g: 0x80, b: 0x00))
+        XCTAssertEqual(Array(frame[0..<10]), [0x08, 0x07, 0x00, 0x00, 0x30, 0x04, 0x80, 0x80, 0x00, 0x55])
+        XCTAssertEqual(frame.count, 17)
+        XCTAssertEqual(frame[16], Protocol.checksum(frame[0..<16]))
+        // The entry written parses back to the same colour.
+        XCTAssertEqual(DPIColor.parse(Array(frame[6..<10])), DPIColor(r: 0x80, g: 0x80, b: 0x00))
         XCTAssertEqual(StageTable.dpiAddress(stage: 5), 0x20)
         // Colour writes seen in the capture: stage 2 -> 80 00 FF d6
         XCTAssertEqual(DPIColor.parse([0x80, 0x00, 0xFF, 0xD6]), DPIColor(r: 0x80, g: 0x00, b: 0xFF))

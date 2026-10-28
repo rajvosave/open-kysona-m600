@@ -53,6 +53,14 @@ public enum Protocol {
         flashWrite(address: address, data: [value, checksum([value])])
     }
 
+    /// Colour of one DPI stage: `R G B chk` at `StageTable.colorAddress`. This is the only
+    /// multi-byte write the app sends; the address range is fixed to the six colour entries.
+    public static func setStageColor(stage: Int, color: DPIColor) -> [UInt8] {
+        precondition((0..<StageTable.stageCount).contains(stage), "stage out of range")
+        let rgb = [color.r, color.g, color.b]
+        return flashWrite(address: StageTable.colorAddress(stage: stage), data: rgb + [checksum(rgb)])
+    }
+
     /// Report rate write: 2 bytes at 0x0000, the one-hot value then its checksum.
     public static func setReportRate(_ value: UInt8) -> [UInt8] {
         writeValue(address: 0x0000, value: value)
