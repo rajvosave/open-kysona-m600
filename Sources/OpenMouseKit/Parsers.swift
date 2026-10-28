@@ -161,22 +161,34 @@ public enum ReportRate: UInt8, CaseIterable {
     public static func parse(valueByte: UInt8) -> ReportRate? { ReportRate(rawValue: valueByte) }
 }
 
-/// Reply to `Protocol.readBattery()`: data at reply byte 6 is `percent flag mV_hi mV_lo`.
-/// Seen as `50 00 0F AB` (80 %, 4011 mV) with a full battery icon in the vendor app, and the
-/// millivolts drift by a few counts between polls. The meaning is a guess: the percent and
-/// millivolt split fits the data, but the flag byte is unknown.
+/// Reply to `Protocol.readBattery()`: data at reply byte 6 is `level charging mV_hi mV_lo`,
+/// the vendor app's `BatteryStatus { level, isCharging, BatVoltage }`. The vendor app draws its
+/// battery icon from `level` (its optional percentage label shows the same byte); the mouse
+/// reports it in steps of 5.
 public struct BatteryStatus: Equatable {
     public var percent: UInt8
-    public var flag: UInt8
+    public var isCharging: Bool
     public var millivolts: Int
-    public init(percent: UInt8, flag: UInt8, millivolts: Int) {
-        self.percent = percent; self.flag = flag; self.millivolts = millivolts
+    public init(percent: UInt8, isCharging: Bool, millivolts: Int) {
+        self.percent = percent; self.isCharging = isCharging; self.millivolts = millivolts
+    }
+
+    /// What to show for the battery. The charger raises the battery voltage, and the level the
+    /// mouse reports while the cable is in is inflated with it: in screen recordings the level
+    /// went 80 -> 85 -> 95 within about 40 s of charging and fell back to 85 on unplugging.
+    /// While charging the last level seen on battery is shown instead; `fullWhileCharging` is
+    /// for when the mouse has reported 100 on several polls in a row.
+    public func summary(lastLevelOnBattery: UInt8?, fullWhileCharging: Bool = false) -> String {
+        guard isCharging else { return "\(percent)%" }
+        if fullWhileCharging { return "100%" }
+        guard let last = lastLevelOnBattery else { return "Charging" }
+        return "Charging (from \(last)%)"
     }
 
     public static func parse(reply: [UInt8]) -> BatteryStatus? {
         guard reply.count == Protocol.reportLength, reply[1] == Protocol.Command.readBattery.rawValue,
               reply[16] == Protocol.checksum(reply[0..<16]) else { return nil }
-        return BatteryStatus(percent: reply[6], flag: reply[7],
+        return BatteryStatus(percent: reply[6], isCharging: reply[7] == 1,
                              millivolts: Int(reply[8]) << 8 | Int(reply[9]))
     }
 }

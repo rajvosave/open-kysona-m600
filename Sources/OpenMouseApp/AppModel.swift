@@ -25,6 +25,28 @@ final class AppModel: ObservableObject {
         }
         transport.start()
         refresh()
+        // The vendor app polls the battery every few seconds; every 30 s is plenty here.
+        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshBattery() }
+        }
+    }
+
+    private func setBattery(_ b: BatteryStatus?) {
+        battery = b
+        guard let b else { return }
+        if !b.isCharging { lastLevelOnBattery = b.percent }
+        fullStreak = (b.isCharging && b.percent >= 100) ? fullStreak + 1 : 0
+        fullWhileCharging = fullStreak >= 2
+    }
+
+    /// Reads just the battery, skipped while another exchange is in flight.
+    func refreshBattery() {
+        guard isOpen, !busy else { return }
+        busy = true
+        Task {
+            defer { busy = false }
+            if let b = try? await device.readBattery() { setBattery(b) }
+        }
     }
 
     private func refresh() {
@@ -32,7 +54,7 @@ final class AppModel: ObservableObject {
         if selectedID == nil || !interfaces.contains(where: { $0.id == selectedID }) {
             selectedID = interfaces.first(where: \.looksLikeVendorChannel)?.id
             isOpen = false
-            settings = nil; stages = []; keys = []; battery = nil
+            settings = nil; stages = []; keys = []; battery = nil; fullStreak = 0; fullWhileCharging = false
             status = selectedID == nil ? "No mouse found. Plug in the dongle." : "Connecting…"
         }
         // Connect on its own once the control channel shows up.
@@ -89,6 +111,11 @@ final class AppModel: ObservableObject {
     @Published var settings: SettingsSnapshot?
     @Published var busy = false
     @Published var battery: BatteryStatus?
+    /// The last level seen while not charging; the reading while charging is inflated by the charger.
+    @Published var lastLevelOnBattery: UInt8?
+    /// True once the mouse has reported 100 on consecutive polls while charging.
+    @Published var fullWhileCharging = false
+    private var fullStreak = 0
     @Published var stages: [MouseDevice.Stage] = []
     /// The button slots from flash; nil for a slot that failed its checksum.
     @Published var keys: [KeyFunction?] = []
@@ -123,7 +150,7 @@ final class AppModel: ObservableObject {
                 settings = try await loadSettings()
                 stages = try await device.readStages()
                 keys = try await device.readKeyMap()
-                battery = try await device.readBattery()
+                setBattery(try await device.readBattery())
                 if initialSettings == nil { initialSettings = settings; initialColors = stages.map(\.color); initialDPIs = stages.map { $0.dpi?.x }; initialKeys = keys }
                 status = settings == nil ? "Unexpected reply. Try Refresh." : "Connected"
             } catch {
@@ -275,6 +302,9 @@ final class AppModel: ObservableObject {
                 if let v = try await device.readVersionRaw() as [UInt8]? {
                     append("version bytes (meaning unconfirmed): \(Self.hex(Array(v[5...7])))")
                 }
+                if let b = try await device.readBattery() {
+                    append("battery: \(b.percent) %, \(b.millivolts) mV, \(b.isCharging ? "charging" : "not charging")")
+                }
                 let rate = try await device.readReportRate()
                 append("report rate: \(rate.map { "\($0.hertz) Hz" } ?? "unknown value")")
                 let index = try await device.readCurrentDPI()
@@ -326,7 +356,7 @@ extension AppModel {
                                                    (3200, 0xFF, 0x80, 0xFF), (6400, 0xFF, 0, 0), (26000, 0x80, 0, 0xFF)]
         m.stages = table.map { MouseDevice.Stage(dpi: DPIEntry(x: $0.0, y: $0.0), color: DPIColor(r: $0.1, g: $0.2, b: $0.3)) }
         m.keys = [.mouse(.left), .mouse(.right), .mouse(.middle), .mouse(.back), .mouse(.forward), .dpi(.loop)]
-        m.battery = BatteryStatus(percent: 80, flag: 0, millivolts: 4011)
+        m.battery = BatteryStatus(percent: 80, isCharging: false, millivolts: 4011)
         return m
     }
 }

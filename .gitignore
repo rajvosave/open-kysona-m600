@@ -8,3 +8,5 @@ Config.ini
 driver_sensor.h
 0-English.xml
 Language/
+*.mov
+*.mp4

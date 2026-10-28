@@ -85,11 +85,14 @@ struct MouseView: View {
             Spacer()
             if let b = model.battery {
                 HStack(spacing: 6) {
-                    Image(systemName: Self.batterySymbol(b.percent))
-                    Text("\(b.percent)%").monospacedDigit()
+                    Image(systemName: Self.batterySymbol(b.percent, charging: b.isCharging))
+                    Text(b.summary(lastLevelOnBattery: model.lastLevelOnBattery, fullWhileCharging: model.fullWhileCharging))
+                        .monospacedDigit()
                 }
                 .foregroundStyle(Theme.dim)
-                .help("\(b.millivolts) mV. The meaning of the battery bytes is unconfirmed.")
+                .help(b.isCharging
+                      ? "\(b.millivolts) mV, charging. The charger raises the battery voltage, so the mouse's level reading (\(b.percent)%) is too high until it is unplugged; the last level seen on battery is shown instead."
+                      : "\(b.millivolts) mV. The percentage is the mouse's own figure and moves in steps of 5.")
             }
             Button(action: onDiagnostics) { Image(systemName: "wrench.and.screwdriver") }
                 .buttonStyle(.plain).foregroundStyle(Theme.dim).help("Diagnostics")
@@ -108,7 +111,8 @@ struct MouseView: View {
         .padding(.horizontal, 28).padding(.vertical, 12)
     }
 
-    static func batterySymbol(_ percent: UInt8) -> String {
+    static func batterySymbol(_ percent: UInt8, charging: Bool = false) -> String {
+        if charging { return "battery.100.bolt" }
         switch percent {
         case 76...: return "battery.100"
         case 51...: return "battery.75"

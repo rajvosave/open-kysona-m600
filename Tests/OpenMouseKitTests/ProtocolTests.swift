@@ -196,10 +196,56 @@ final class ProtocolTests: XCTestCase {
         r[0] = 0x08; r[1] = 0x04; r[5] = 0x02; r[6] = 0x50; r[7] = 0x00; r[8] = 0x0F; r[9] = 0xB4
         r[16] = Protocol.checksum(r[0..<16])
         XCTAssertEqual(r[16], 0x34)   // matches the captured frame
-        XCTAssertEqual(BatteryStatus.parse(reply: r), BatteryStatus(percent: 80, flag: 0, millivolts: 4020))
+        XCTAssertEqual(BatteryStatus.parse(reply: r), BatteryStatus(percent: 80, isCharging: false, millivolts: 4020))
         r[16] ^= 0xFF
         XCTAssertNil(BatteryStatus.parse(reply: r))
         XCTAssertEqual(Protocol.readBattery()[1], 0x04)
+    }
+
+    func testBatteryReplyFields() {
+        // Reply from the test mouse: 08 04 00 00 00 02 4B 00 0F 9E ... = 75 %, not charging, 3998 mV.
+        var r = [UInt8](repeating: 0, count: 17)
+        r[0] = 0x08; r[1] = 0x04; r[5] = 0x02; r[6] = 0x4B; r[8] = 0x0F; r[9] = 0x9E
+        r[16] = Protocol.checksum(r[0..<16])
+        XCTAssertEqual(BatteryStatus.parse(reply: r), BatteryStatus(percent: 75, isCharging: false, millivolts: 3998))
+        // The second byte is the charging flag (the vendor app's isCharging == 1).
+        r[7] = 1; r[16] = Protocol.checksum(r[0..<16])
+        XCTAssertEqual(BatteryStatus.parse(reply: r)?.isCharging, true)
+        XCTAssertEqual(BatteryStatus.parse(reply: r)?.percent, 75)
+    }
+
+    func testBatteryWhileCharging() {
+        // Replies from the test mouse around plugging the cable in: the level did not jump,
+        // it stayed at 75 and then climbed in steps of 5 while only the voltage rose.
+        func reply(_ level: UInt8, _ charging: UInt8, _ mv: UInt16) -> BatteryStatus? {
+            var r = [UInt8](repeating: 0, count: 17)
+            r[0] = 0x08; r[1] = 0x04; r[5] = 0x02
+            r[6] = level; r[7] = charging; r[8] = UInt8(mv >> 8); r[9] = UInt8(mv & 0xFF)
+            r[16] = Protocol.checksum(r[0..<16])
+            return BatteryStatus.parse(reply: r)
+        }
+        XCTAssertEqual(reply(0x4B, 0, 0x0F9E), BatteryStatus(percent: 75, isCharging: false, millivolts: 3998))
+        XCTAssertEqual(reply(0x4B, 1, 0x0FF2), BatteryStatus(percent: 75, isCharging: true, millivolts: 4082))
+        XCTAssertEqual(reply(0x50, 1, 0x0FF6), BatteryStatus(percent: 80, isCharging: true, millivolts: 4086))
+        XCTAssertEqual(reply(0x55, 1, 0x0FF6), BatteryStatus(percent: 85, isCharging: true, millivolts: 4086))
+    }
+
+    func testBatterySummaryWhileCharging() {
+        // The sequence from the second screen recording: 80 % on battery, then charging with the
+        // level reading 80, 85, 95, and 85 again on battery after unplugging.
+        let onBattery = BatteryStatus(percent: 80, isCharging: false, millivolts: 4010)
+        XCTAssertEqual(onBattery.summary(lastLevelOnBattery: nil), "80%")
+        for level: UInt8 in [80, 85, 95] {
+            let charging = BatteryStatus(percent: level, isCharging: true, millivolts: 4086)
+            XCTAssertEqual(charging.summary(lastLevelOnBattery: 80), "Charging (from 80%)")
+        }
+        XCTAssertEqual(BatteryStatus(percent: 85, isCharging: false, millivolts: 4020).summary(lastLevelOnBattery: 80), "85%")
+        // Started while charging: no earlier level to show.
+        XCTAssertEqual(BatteryStatus(percent: 95, isCharging: true, millivolts: 4086).summary(lastLevelOnBattery: nil), "Charging")
+        // Full, once the model has seen 100 on consecutive polls.
+        let full = BatteryStatus(percent: 100, isCharging: true, millivolts: 4150)
+        XCTAssertEqual(full.summary(lastLevelOnBattery: 80), "Charging (from 80%)")
+        XCTAssertEqual(full.summary(lastLevelOnBattery: 80, fullWhileCharging: true), "100%")
     }
 
     func testKeyMapEntries() {
