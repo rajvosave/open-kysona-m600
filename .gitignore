@@ -10,3 +10,4 @@ driver_sensor.h
 Language/
 *.mov
 *.mp4
+build/OpenMouse.app/
