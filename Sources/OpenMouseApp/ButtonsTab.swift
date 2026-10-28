@@ -7,7 +7,8 @@ struct PhysicalButton: Identifiable {
     let name: String
     /// Index into the mouse's key table. Buttons 4 and 5 are in the opposite order to flash:
     /// the vendor app shows 4 = Forward (`01 10`, flash slot 4) and 5 = Back (`01 08`, slot 3).
-    /// Which side button is which is inferred from that layout, not confirmed by pressing them.
+    /// Confirmed on the test mouse: remapping the side buttons (Forward to DPI up, Back to DPI down)
+    /// changed the physical buttons the app labelled.
     let slot: Int
     /// Marker position on the 300 x 440 mouse drawing.
     let marker: CGPoint
