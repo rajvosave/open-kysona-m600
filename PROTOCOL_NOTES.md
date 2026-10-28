@@ -100,7 +100,7 @@ Only 0x0000..0x00BF holds data. Everything from 0x00BE up to 0x01FF, and every a
 | 0x0C..0x2F | 8 entries of `x y hi chk`: `07 0F 1F 3F 7F` then `07 07 88` x3 and a zero entry | structure certain, meaning unknown. Doubling codes look like DPI register values (800, 1600, 3200, 6400, 12800 if value = (code+1)*100) |
 | 0x30..0x4B | 7 RGB+checksum colours: red, green, blue, cyan, magenta x3 | structure certain, likely per-stage DPI colours |
 | 0x4C..0x53 | `02 53 80 d5 03 52 00 55`: matches the DPI LED parser (defaults 02, 80, 03, 01), here mode 2, 0x80, 3, off | likely |
-| 0x5C..0x9B | 16 slots of `type a b chk`: `01 01`, `01 02`, `01 04`, `01 08`, `01 10` (HID mouse button bitmask 1..5), then `02 01`, `07 00`, `02 02`, `02 03` | likely the button remap table (Config.ini has 16 key slots) |
+| 0x60..0x9F | 16 slots of `type a b chk` (corrected: the table starts at 0x60, see the button map section): `01 01`, `01 02`, `01 04`, `01 08`, `01 10` (HID mouse button bitmask 1..5), then `02 01`, `07 00`, `02 02`, `02 03` | likely the button remap table (Config.ini has 16 key slots) |
 | 0xA0..0xBD | mixed value/checksum pairs | unknown |
 
 ## Second capture: writes and polling (Windows app, F5D5 dongle)
@@ -145,3 +145,26 @@ Peak Performance (greyed checkbox) was not exercised, so its address is unknown.
 ## Write path verified on hardware (2026-10-27)
 
 The Mac app wrote ripple control (0x00B1) with `Protocol.writeValue`: the mouse echoed the frame, a read-back matched, and the vendor Windows app then showed the setting on. Turning it off in the Windows app was read back as 0 by the Mac app. So write frames, echo, checksum and the address/meaning of ripple control are confirmed in both directions.
+
+## Button map (from the vendor app's own data model and Config.ini)
+
+Flash `0x60 + 4 * slot`, 16 slots, each `type param1 param2 chk` (chk = `0x55 - sum` of the three bytes, confirmed on the mouse). `0x5C..0x5F` is not a slot: it holds two value/checksum pairs, `03` and `00`, meaning unknown. Slot types:
+
+| type | function | param1 | param2 |
+|---|---|---|---|
+| 0 | disabled | 0 | 0 |
+| 1 | mouse button | bitmask: left 1, right 2, middle 4, back 8, forward 0x10 | 0 |
+| 2 | DPI | 1 loop, 2 up, 3 down | 0 |
+| 3 | AC-Pan (horizontal scroll) | 1 left, 2 right | 0 |
+| 4 | fire key (rapid click) | interval | click count |
+| 5 | shortcut | 0, details stored in a separate per-slot table | 0 |
+| 6 | macro | macro id | repeat count |
+| 7 | report-rate switch | 0 | 0 |
+| 9 | config/profile switch | 0 | 0 |
+| 10 | DPI lock (hold for a fixed DPI) | stage index | 0 |
+
+Type 8 (LED switch) exists in the vendor app's UI list but its slot encoding was not seen. The vendor library writes by diffing a whole in-memory flash map against the last read and sending only the changed ranges, so a remap is an ordinary flash write at the slot address. Shortcut and macro bodies live in other flash regions that have not been mapped.
+
+Config.ini `KeyParam1..6` for the M600 V2 list the physical buttons with their default functions: left `01 01`, right `01 02`, middle `01 04`, then `01 10`, `01 08` for the two side buttons, then `02 01` for the DPI button. The earlier capture of the flash table read `01 01, 01 02, 01 04, 01 08, 01 10, 02 01, 07 00, 02 02, 02 03` in slot order, so the slot-to-physical-button mapping needs checking on the mouse.
+
+Dump of the test mouse (slots from 0x60): left, right, middle, back (`01 08`), forward (`01 10`), DPI cycle (`02 01`), two disabled, report-rate switch (`07 00`), DPI up (`02 02`), DPI down (`02 03`), then disabled. Slots 0..5 are the six physical buttons; the rest have no identified button. Writing slot 4 (`0x70`) to `02 02 00 51` and back to `01 10 00 44` was echoed by the mouse and read back correctly. Which physical button each slot is has not been confirmed beyond the factory defaults.

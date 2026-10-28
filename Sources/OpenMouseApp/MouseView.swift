@@ -40,6 +40,7 @@ struct MouseView: View {
         VStack(alignment: .leading, spacing: 32) {
             dpiSection
             rateSection
+            buttonSection
             sensorSection
         }
         .padding(28)
@@ -187,6 +188,56 @@ struct MouseView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: buttons
+
+    /// Named by each button's factory function (its default in the mouse's flash).
+    private static let buttonNames = ["Left button", "Right button", "Middle button",
+                                      "Back button", "Forward button", "DPI button"]
+
+    private var buttonSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Buttons")
+            if model.keys.count < KeyMap.physicalSlots.count {
+                Text("Waiting for the mouse…").foregroundStyle(Theme.dim)
+            } else {
+                ForEach(Array(KeyMap.physicalSlots), id: \.self) { slot in
+                    HStack {
+                        Text(Self.buttonNames[slot]).foregroundStyle(Theme.dim).frame(width: 150, alignment: .leading)
+                        buttonMenu(slot)
+                    }
+                }
+            }
+            Text("Names are each button's factory function. At least one button always stays Left click. Macros and shortcuts can't be edited yet.")
+                .font(.caption).foregroundStyle(Theme.dim)
+        }
+    }
+
+    @ViewBuilder private func buttonMenu(_ slot: Int) -> some View {
+        let current = model.keys[slot]
+        if let current, current.isEditable, scrollable {
+            Menu {
+                ForEach(KeyFunction.choices, id: \.title) { choice in
+                    Button(choice.title) { model.changeKey(slot: slot, to: choice) }
+                }
+            } label: {
+                Text(current.title).frame(width: 170, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Theme.panel, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.hairline))
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .disabled(!enabled)
+        } else if let current, current.isEditable {
+            // ImageRenderer can't draw a Menu, so the preview image shows the same chip as text.
+            Text(current.title).frame(width: 170, alignment: .leading)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.hairline))
+        } else {
+            Text(current?.title ?? "unreadable").foregroundStyle(Theme.dim)
         }
     }
 

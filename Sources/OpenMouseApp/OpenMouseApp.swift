@@ -22,7 +22,7 @@ private func renderPreviewIfRequested() {
     guard let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count else { return }
     let renderer = ImageRenderer(content: MouseView(scrollable: false)
         .environmentObject(AppModel.demo())
-        .frame(width: 820, height: 700))
+        .frame(width: 820, height: 1010))
     renderer.scale = 2
     if let tiff = renderer.nsImage?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
        let png = rep.representation(using: .png, properties: [:]) {

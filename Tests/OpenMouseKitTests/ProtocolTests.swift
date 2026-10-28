@@ -188,4 +188,40 @@ final class ProtocolTests: XCTestCase {
         XCTAssertNil(BatteryStatus.parse(reply: r))
         XCTAssertEqual(Protocol.readBattery()[1], 0x04)
     }
+
+    func testKeyMapEntries() {
+        XCTAssertEqual(KeyMap.address(slot: 0), 0x60)
+        XCTAssertEqual(KeyMap.address(slot: 15), 0x9C)
+        // Default left click: 01 01 00 chk.
+        let left = KeyMap.entry(for: .mouse(.left))
+        XCTAssertEqual(Array(left[0..<3]), [0x01, 0x01, 0x00])
+        XCTAssertEqual(KeyMap.parse(left), .mouse(.left))
+        XCTAssertNil(KeyMap.parse([0x01, 0x01, 0x00, 0x00]))
+        // The slot types seen in the first capture decode to the expected functions.
+        func entry(_ t: UInt8, _ a: UInt8) -> [UInt8] { [t, a, 0, Protocol.checksum([t, a, 0])] }
+        XCTAssertEqual(KeyMap.parse(entry(0x02, 0x01)), .dpi(.loop))
+        XCTAssertEqual(KeyMap.parse(entry(0x07, 0x00)), .reportRate)
+        XCTAssertEqual(KeyMap.parse(entry(0x01, 0x10)), .mouse(.forward))
+        // Unknown or unsupported slots are kept raw and are not editable.
+        XCTAssertEqual(KeyMap.parse(entry(0x06, 0x02)), .other(type: 6, param1: 2, param2: 0))
+        XCTAssertFalse(KeyFunction.other(type: 6, param1: 2, param2: 0).isEditable)
+        // Every choice round-trips through its bytes.
+        for f in KeyFunction.choices {
+            XCTAssertEqual(KeyMap.parse(KeyMap.entry(for: f)), f)
+        }
+        // Slot write frame: 08 07 00 00 <addr> 04 type p1 p2 chk.
+        let frame = Protocol.setKeyFunction(slot: 5, .dpi(.up))
+        XCTAssertEqual(Array(frame[0..<10]), [0x08, 0x07, 0x00, 0x00, 0x74, 0x04, 0x02, 0x02, 0x00, 0x51])
+        XCTAssertEqual(frame[16], Protocol.checksum(frame[0..<16]))
+
+        // Entries dumped from the mouse (slots at 0x60...): every one parses.
+        let dump: [[UInt8]] = [[1, 1, 0, 0x53], [1, 2, 0, 0x52], [1, 4, 0, 0x50], [1, 8, 0, 0x4C],
+                               [1, 0x10, 0, 0x44], [2, 1, 0, 0x52], [0, 0, 0, 0x55], [7, 0, 0, 0x4E],
+                               [2, 2, 0, 0x51], [2, 3, 0, 0x50]]
+        XCTAssertEqual(dump.map { KeyMap.parse($0)?.title },
+                       ["Left click", "Right click", "Middle click", "Back", "Forward",
+                        "DPI cycle", "Disabled", "Report rate switch", "DPI up", "DPI down"])
+        // The two pairs just before the table are not a slot.
+        XCTAssertNil(KeyMap.parse([0x03, 0x52, 0x00, 0x55]))
+    }
 }

@@ -40,8 +40,17 @@ public final class MouseDevice {
         waiter = nil
     }
 
-    /// Sends a frame and waits for the next input report.
+    /// Sends a frame and waits for its reply. A sleeping wireless mouse can take more than a
+    /// second to answer its first request, so anything but a write is retried once on a timeout.
+    /// Writes are never resent.
     public func exchange(_ frame: [UInt8], timeout: TimeInterval = 1.0) async throws -> [UInt8] {
+        do { return try await exchangeOnce(frame, timeout: timeout) }
+        catch HIDTransportError.timeout where frame[1] != Protocol.Command.flashWrite.rawValue {
+            return try await exchangeOnce(frame, timeout: timeout * 2)
+        }
+    }
+
+    private func exchangeOnce(_ frame: [UInt8], timeout: TimeInterval) async throws -> [UInt8] {
         onTraffic?(.sent, frame)
         pending = frame
         return try await withCheckedThrowingContinuation { continuation in
@@ -129,6 +138,20 @@ public final class MouseDevice {
             Stage(dpi: DPIEntry.parse(Array(dpi[(4 * i)..<(4 * i + 4)])),
                   color: DPIColor.parse(Array(color[(4 * i)..<(4 * i + 4)])))
         }
+    }
+
+    /// The 16 button slots, nil for a slot whose checksum fails.
+    public func readKeyMap() async throws -> [KeyFunction?] {
+        let raw = try await readFlash(address: KeyMap.baseAddress, length: 4 * KeyMap.slotCount)
+        return (0..<KeyMap.slotCount).map { KeyMap.parse(Array(raw[(4 * $0)..<(4 * $0 + 4)])) }
+    }
+
+    /// Writes one button slot and returns true if the mouse echoed the frame unchanged.
+    /// Only the six physical buttons and only editable functions are accepted.
+    public func writeKeyFunction(slot: Int, _ function: KeyFunction) async throws -> Bool {
+        guard KeyMap.physicalSlots.contains(slot), function.isEditable else { throw HIDTransportError.valueRejected }
+        let frame = Protocol.setKeyFunction(slot: slot, function)
+        return try await exchange(frame) == frame
     }
 
     /// Reads a flash range in 10-byte packets and returns each raw reply.

@@ -20,7 +20,8 @@ and the wired mouse use the same vendor ID and are matched, but are untested.
 | Ripple control, angle snapping, motion sync | yes | yes |
 | Sensor mode (LP / HP), Peak Performance | LP only | no |
 | Battery | yes (meaning of the bytes is inferred) | – |
-| Button remaps, macros, LED settings | not decoded yet | no |
+| Button remaps (clicks, DPI, scroll, report rate, profile, disable) | yes | yes (six physical buttons) |
+| Macros, shortcuts, fire key, LED settings | not decoded yet | no |
 | Firmware update | never | never |
 
 Every write is checked: the mouse must echo the frame back, and the value is read back and
@@ -65,7 +66,7 @@ implemented. Use at your own risk; see the licence.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/capturing.md](docs/capturing.md). Captures are the most useful contribution: a USBPcap/Wireshark capture of the vendor app changing
-one setting at a time, with the clock visible in a screen recording. Button remaps, LED settings
+one setting at a time, with the clock visible in a screen recording. Macros, shortcuts, LED settings
 and sensor mode are the missing pieces.
 
 This project is not affiliated with or endorsed by Kysona. "Kysona" and "M600" are used only to
