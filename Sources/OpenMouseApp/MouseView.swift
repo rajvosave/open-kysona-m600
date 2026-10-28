@@ -278,26 +278,40 @@ struct MouseView: View {
                         }
                     }
                     labelled("Mode") {
-                        Text(sensorModeText).padding(.horizontal, 18).padding(.vertical, 7)
-                            .background(Theme.panel, in: Capsule()).foregroundStyle(Theme.dim)
+                        HStack(spacing: 12) {
+                            pill("LP", selected: model.settings?.sensorMode == 0) { model.change(.sensorMode, to: 0, name: "sensor mode") }
+                            pill("HP", selected: model.settings?.sensorMode == 1) { model.change(.sensorMode, to: 1, name: "sensor mode") }
+                            if let mode = model.settings?.sensorMode, mode > 1 {
+                                Text(mode == 10 ? "Corded" : "Mode \(mode)").foregroundStyle(Theme.dim)
+                            }
+                        }
                     }
-                    Text("Sensor mode and Peak Performance can't be changed yet.")
+                    if let peak = model.settings?.peakPerformance {
+                        labelled("Peak Performance time") {
+                            HStack(spacing: 8) {
+                                ForEach(PeakDuration.allCases, id: \.rawValue) { d in
+                                    pill(d.title, selected: model.settings?.peakTime == d.rawValue) {
+                                        model.change(.peakPerformanceTime, to: d.rawValue, name: "peak performance time")
+                                    }
+                                    .disabled(peak == 0)
+                                }
+                            }
+                        }
+                    }
+                    Text("LP saves battery; HP is the high-performance mode and uses more. The mode can only be changed over the wireless dongle. Peak Performance holds the sensor at maximum performance for the chosen time.")
                         .font(.caption).foregroundStyle(Theme.dim)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 520, alignment: .leading)
                 }
                 VStack(alignment: .leading, spacing: 16) {
                     switchRow("Ripple control", model.settings?.rippleControl, .rippleControl)
                     switchRow("Angle snapping", model.settings?.angleSnapping, .angleSnapping)
                     switchRow("Motion sync", model.settings?.motionSync, .motionSync)
+                    if model.settings?.peakPerformance != nil {
+                        switchRow("Peak Performance", model.settings?.peakPerformance, .peakPerformance)
+                    }
                 }
             }
-        }
-    }
-
-    private var sensorModeText: String {
-        switch model.settings?.sensorMode {
-        case 0: return "LP"
-        case .some(let v): return "Mode \(v)"
-        case nil: return "–"
         }
     }
 

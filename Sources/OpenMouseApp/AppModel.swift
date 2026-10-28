@@ -80,7 +80,10 @@ final class AppModel: ObservableObject {
         var motionSync: UInt8
         var angleSnapping: UInt8
         var rippleControl: UInt8
-        var sensorMode: UInt8   // 0 = LP; HP value unconfirmed, so read-only
+        var sensorMode: UInt8   // 0 = LP, 1 = HP, 10 = corded (read-only)
+        /// Nil if the mouse didn't answer these with a valid checksum.
+        var peakPerformance: UInt8?
+        var peakTime: UInt8?
     }
 
     @Published var settings: SettingsSnapshot?
@@ -106,7 +109,9 @@ final class AppModel: ObservableObject {
         }
         return SettingsSnapshot(reportRate: v[.reportRate]!, dpiStage: v[.currentDPIIndex]!, lod: v[.lod]!,
                                 motionSync: v[.motionSync]!, angleSnapping: v[.angleSnapping]!,
-                                rippleControl: v[.rippleControl]!, sensorMode: v[.sensorMode]!)
+                                rippleControl: v[.rippleControl]!, sensorMode: v[.sensorMode]!,
+                                peakPerformance: try await device.readValue(.peakPerformance),
+                                peakTime: try await device.readValue(.peakPerformanceTime))
     }
 
     func refreshSettings() {
@@ -241,8 +246,11 @@ final class AppModel: ObservableObject {
                     (.lod, "LOD", now.lod, target.lod),
                     (.motionSync, "motion sync", now.motionSync, target.motionSync),
                     (.angleSnapping, "angle snapping", now.angleSnapping, target.angleSnapping),
-                    (.rippleControl, "ripple control", now.rippleControl, target.rippleControl)]
-                for (setting, name, current, wanted) in pairs where current != wanted {
+                    (.rippleControl, "ripple control", now.rippleControl, target.rippleControl),
+                    (.sensorMode, "sensor mode", now.sensorMode, target.sensorMode),
+                    (.peakPerformance, "peak performance", now.peakPerformance ?? 0, target.peakPerformance ?? 0),
+                    (.peakPerformanceTime, "peak performance time", now.peakTime ?? 0, target.peakTime ?? 0)]
+                for (setting, name, current, wanted) in pairs where current != wanted && setting.accepts(wanted) {
                     try await writeAndVerify(setting, wanted, name: name)
                 }
                 settings = try await loadSettings()
@@ -281,7 +289,8 @@ final class AppModel: ObservableObject {
                 }
                 for (name, setting) in [("LOD (1=1mm, 2=2mm)", MouseSetting.lod),
                                         ("motion sync", .motionSync), ("angle snapping", .angleSnapping),
-                                        ("ripple control", .rippleControl), ("sensor mode (0=LP)", .sensorMode)] {
+                                        ("ripple control", .rippleControl), ("sensor mode (0=LP, 1=HP, 10=corded)", .sensorMode),
+                                        ("peak performance", .peakPerformance), ("peak performance time (x10 s)", .peakPerformanceTime)] {
                     let v = try await device.readValue(setting)
                     append("\(name): \(v.map(String.init) ?? "bad checksum")")
                 }
@@ -311,7 +320,8 @@ extension AppModel {
         m.isOpen = true
         m.status = "Connected"
         m.settings = SettingsSnapshot(reportRate: 0x01, dpiStage: 2, lod: 1, motionSync: 1,
-                                      angleSnapping: 0, rippleControl: 0, sensorMode: 0)
+                                      angleSnapping: 0, rippleControl: 0, sensorMode: 0,
+                                      peakPerformance: 1, peakTime: 6)
         let table: [(Int, UInt8, UInt8, UInt8)] = [(400, 0x80, 0x80, 0), (800, 0, 0xFF, 0), (1600, 0x80, 0, 0xFF),
                                                    (3200, 0xFF, 0x80, 0xFF), (6400, 0xFF, 0, 0), (26000, 0x80, 0, 0xFF)]
         m.stages = table.map { MouseDevice.Stage(dpi: DPIEntry(x: $0.0, y: $0.0), color: DPIColor(r: $0.1, g: $0.2, b: $0.3)) }

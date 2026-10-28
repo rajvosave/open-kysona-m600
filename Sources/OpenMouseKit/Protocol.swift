@@ -94,19 +94,23 @@ public enum Protocol {
         case motionSync = 0x00AB       // 1 = on
         case angleSnapping = 0x00AF    // 1 = on
         case rippleControl = 0x00B1    // 1 = on
-        /// 0 = LP (read back as 00). The app sent 01 (HP) while the mouse was asleep, got no
-        /// acknowledgement and reverted, so 01 = HP is unconfirmed.
+        /// 0 = LP, 1 = HP (vendor app's language file); 10 = corded, which the vendor app shows
+        /// but never writes. Only changeable over the wireless dongle.
         case sensorMode = 0x00B9
+        /// Peak Performance on/off (`sensorCustomSleepTimeEnable` in the vendor app's data model).
+        case peakPerformance = 0x00B5
+        /// How long Peak Performance lasts, a `PeakDuration` value (`sensorSleepTime`).
+        case peakPerformanceTime = 0x00B7
 
         /// Values the vendor app was seen to write (or that are valid for the control).
-        /// Sensor mode is never accepted: its HP value is unconfirmed.
         public func accepts(_ value: UInt8) -> Bool {
             switch self {
             case .reportRate: return ReportRate(rawValue: value) != nil
             case .currentDPIIndex: return Int(value) < StageTable.stageCount
             case .lod: return (1...2).contains(value)
             case .motionSync, .angleSnapping, .rippleControl: return value <= 1
-            case .sensorMode: return false
+            case .sensorMode, .peakPerformance: return value <= 1
+            case .peakPerformanceTime: return PeakDuration(rawValue: value) != nil
             }
         }
     }

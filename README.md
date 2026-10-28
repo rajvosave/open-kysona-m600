@@ -19,7 +19,7 @@ and the wired mouse use the same vendor ID and are matched, but are untested.
 | Report rate 125 / 250 / 500 / 1000 Hz | yes | yes |
 | Lift-off distance 1 / 2 mm | yes | yes |
 | Ripple control, angle snapping, motion sync | yes | yes |
-| Sensor mode (LP / HP), Peak Performance | LP only | no |
+| Sensor mode (LP / HP), Peak Performance on/off and duration | yes | yes (wireless only for the mode) |
 | Battery | yes (meaning of the bytes is inferred) | – |
 | Button remaps (clicks, DPI, scroll, report rate, profile, disable) | yes | yes (six physical buttons) |
 | Macros, shortcuts, fire key, LED settings | not decoded yet | no |

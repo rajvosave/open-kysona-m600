@@ -24,7 +24,7 @@ private func renderPreviewIfRequested() {
     let buttons = args.count > i + 2 && args[i + 2] == "buttons"
     let renderer = ImageRenderer(content: MouseView(scrollable: false, tab: buttons ? .buttons : .settings)
         .environmentObject(AppModel.demo())
-        .frame(width: 820, height: buttons ? 640 : 760))
+        .frame(width: 820, height: buttons ? 640 : 840))
     renderer.scale = 2
     if let tiff = renderer.nsImage?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
        let png = rep.representation(using: .png, properties: [:]) {

@@ -167,7 +167,20 @@ final class ProtocolTests: XCTestCase {
         XCTAssertTrue(MouseSetting.lod.accepts(2))
         XCTAssertFalse(MouseSetting.lod.accepts(0))
         XCTAssertFalse(MouseSetting.rippleControl.accepts(2))
-        XCTAssertFalse(MouseSetting.sensorMode.accepts(0))
+        XCTAssertTrue(MouseSetting.sensorMode.accepts(0))   // LP
+        XCTAssertTrue(MouseSetting.sensorMode.accepts(1))   // HP
+        XCTAssertFalse(MouseSetting.sensorMode.accepts(10)) // corded: shown, never written
+        XCTAssertTrue(MouseSetting.peakPerformance.accepts(1))
+        XCTAssertFalse(MouseSetting.peakPerformance.accepts(2))
+        XCTAssertEqual(PeakDuration.allCases.map(\.rawValue), [3, 6, 12, 30, 60, 90])
+        for v in UInt8(0)...100 {
+            XCTAssertEqual(MouseSetting.peakPerformanceTime.accepts(v), PeakDuration(rawValue: v) != nil)
+        }
+        // Addresses follow the vendor data model's two-byte pairs after ripple control (0xB1).
+        XCTAssertEqual([MouseSetting.peakPerformance, .peakPerformanceTime, .sensorMode].map(\.rawValue), [0xB5, 0xB7, 0xB9])
+        // HP write: 08 07 00 00 B9 02 01 54 ...
+        XCTAssertEqual(Array(Protocol.writeValue(address: MouseSetting.sensorMode.rawValue, value: 1)[0..<8]),
+                       [0x08, 0x07, 0x00, 0x00, 0xB9, 0x02, 0x01, 0x54])
     }
 
     func testDPIStageWriteMatchesCapture() {

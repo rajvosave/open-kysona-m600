@@ -127,6 +127,23 @@ public enum StageTable {
     public static func colorAddress(stage: Int) -> UInt16 { UInt16(0x2C + 4 * stage) }
 }
 
+/// Peak Performance durations from the vendor app's language file; the stored value is in units
+/// of 10 seconds.
+public enum PeakDuration: UInt8, CaseIterable {
+    case seconds30 = 3, minute1 = 6, minutes2 = 12, minutes5 = 30, minutes10 = 60, minutes15 = 90
+
+    public var title: String {
+        switch self {
+        case .seconds30: return "30 s"
+        case .minute1: return "1 min"
+        case .minutes2: return "2 min"
+        case .minutes5: return "5 min"
+        case .minutes10: return "10 min"
+        case .minutes15: return "15 min"
+        }
+    }
+}
+
 /// Report rate at flash 0x0000: a one-hot byte (value, then checksum at 0x0001).
 /// The mouse's own button cycles it 125 -> 250 -> 500 -> 1000 Hz and wraps.
 public enum ReportRate: UInt8, CaseIterable {
