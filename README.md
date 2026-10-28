@@ -28,6 +28,32 @@ and the wired mouse use the same vendor ID and are matched, but are untested.
 Every write is checked: the mouse must echo the frame back, and the value is read back and
 compared. The app also refreshes by itself when you press the mouse's own DPI or report-rate button.
 
+## Install
+
+There is no prebuilt download, so build it yourself. An app you build on your own Mac opens
+normally, with no Gatekeeper warning.
+
+1. Install the command line tools if you don't have Xcode: `xcode-select --install`.
+2. Clone and build:
+
+   ```sh
+   git clone https://github.com/rajvosave/open-kysona-m600.git
+   cd open-kysona-m600
+   Scripts/make-app.sh
+   ```
+
+3. Move `dist/OpenMouse.app` to `/Applications` (optional) and open it.
+4. Allow **Input Monitoring** when asked, then quit and reopen the app.
+5. Plug in the dongle and move the mouse. The app connects on its own.
+
+Rebuilding changes the app's ad-hoc signature, so macOS asks for Input Monitoring again. If the app
+stops connecting after a rebuild, run `tccutil reset ListenEvent io.github.rajvosave.openmouse` and
+reopen it.
+
+A `.app` copied from someone else's Mac is not notarized. macOS blocks it until you right-click →
+Open (or use Privacy & Security → Open Anyway), and it only runs on the same CPU architecture it was
+built on.
+
 ## Build and run
 
 Needs macOS 13+ and a Swift 5.9 toolchain (Xcode or the command line tools).
