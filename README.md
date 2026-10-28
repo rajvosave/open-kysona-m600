@@ -46,7 +46,7 @@ It is ad-hoc signed, not notarized, so macOS blocks it the first time.
 3. Open the app and allow **Input Monitoring** when asked, then quit and reopen it.
 4. Plug in the dongle and move the mouse. The app connects on its own.
 
-SHA-256 of the current zip: `96d575df39420ba2c04c5e0f50c3580ad0b8de102db0a7fa577306dcec0f7414`
+SHA-256 of the current zip: `d237e1305f4a8240cb699a9cd73bf07e3ac101984fff6bfd55ff4fb0ab64a926`
 
 ### Build it yourself
 
@@ -82,6 +82,13 @@ interface shared with the pointer. Allow it in System Settings → Privacy & Sec
 Monitoring, then restart the app. The app never seizes the device, so the pointer keeps working.
 
 The wrench button opens a Diagnostics sheet with the HID interface list, raw probes and the traffic log.
+
+## Menu bar
+
+OpenMouse puts a mouse icon with the battery level in the menu bar (a bolt while charging). Its
+menu switches the DPI stage and report rate, opens the settings window, and quits the app.
+Closing the window removes the Dock icon but leaves the menu bar item running, so the app stays
+available. Use "Open Settings…" in the menu to bring the window back, or "Quit OpenMouse" to exit.
 
 ## How it was made
 
