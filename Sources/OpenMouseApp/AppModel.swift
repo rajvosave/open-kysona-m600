@@ -45,7 +45,15 @@ final class AppModel: ObservableObject {
         busy = true
         Task {
             defer { busy = false }
-            if let b = try? await device.readBattery() { setBattery(b) }
+            if let b = try? await device.readBattery() {
+                batteryMisses = 0
+                setBattery(b)
+            } else {
+                // The dongle stays plugged in when the mouse sleeps or is off, and then the poll
+                // just times out. Drop the old reading after two misses instead of showing it forever.
+                batteryMisses += 1
+                if batteryMisses >= 2 { setBattery(nil); fullStreak = 0; fullWhileCharging = false }
+            }
         }
     }
 
@@ -116,6 +124,7 @@ final class AppModel: ObservableObject {
     /// True once the mouse has reported 100 on consecutive polls while charging.
     @Published var fullWhileCharging = false
     private var fullStreak = 0
+    private var batteryMisses = 0
     @Published var stages: [MouseDevice.Stage] = []
     /// The button slots from flash; nil for a slot that failed its checksum.
     @Published var keys: [KeyFunction?] = []
