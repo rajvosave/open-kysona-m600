@@ -46,7 +46,7 @@ It is ad-hoc signed, not notarized, so macOS blocks it the first time.
 3. Open the app and allow **Input Monitoring** when asked, then quit and reopen it.
 4. Plug in the dongle and move the mouse. The app connects on its own.
 
-SHA-256 of the current zip: `d237e1305f4a8240cb699a9cd73bf07e3ac101984fff6bfd55ff4fb0ab64a926`
+SHA-256 of the current zip: `086afbb6cacc7c8b8e5037c7c5a441187bf598bf8234a105a06148cd8a106802`
 
 ### Build it yourself
 
